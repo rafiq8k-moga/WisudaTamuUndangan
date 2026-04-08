@@ -77,11 +77,18 @@ class TamuResource extends Resource
                         ->label('Download QR')
                         ->icon('heroicon-o-qr-code')
                         ->color('success')
-                        ->url(function (Collection $records) {
-                            $ids = $records->pluck('id')->implode(',');
-                            return "/api/bulk-download-qr?ids=" . urlencode($ids);
-                        })
-                        ->openUrlInNewTab(),
+                        ->action(function (Collection $records) {
+                            $ids = $records->pluck('id')->toArray();
+                            
+                            // Create form data
+                            $formData = http_build_query(['ids' => $ids]);
+                            
+                            // Create temporary HTML form and submit
+                            return response()->view('bulk-download-form', [
+                                'url' => '/api/bulk-download-qr',
+                                'ids' => $ids
+                            ]);
+                        }),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
