@@ -32,48 +32,55 @@ class ListTamus extends ListRecords
                         ->maxSize(1024), // 1MB
                 ])
                 ->action(function (array $data) {
-                    $csvPath = Storage::disk('local')->path($data['csv_file']);
-                    $csvContent = file_get_contents($csvPath);
-                    $lines = explode("\n", $csvContent);
-                    
-                    $importedCount = 0;
-                    $skippedCount = 0;
-                    
-                    // Skip header (first line)
-                    array_shift($lines);
-                    
-                    foreach ($lines as $line) {
-                        $line = trim($line);
-                        if (empty($line)) continue;
+                    try {
+                        $csvContent = Storage::disk('local')->get($data['csv_file']);
+                        $lines = explode("\n", $csvContent);
                         
-                        // Handle both comma and semicolon separators
-                        $data = str_getcsv($line, ',', '"');
-                        if (count($data) == 1) {
-                            $data = str_getcsv($line, ';', '"');
-                        }
+                        $importedCount = 0;
+                        $skippedCount = 0;
                         
-                        $nama = trim($data[0] ?? '');
+                        // Skip header (first line)
+                        array_shift($lines);
                         
-                        if (!empty($nama)) {
-                            // Check if already exists
-                            $exists = Tamu::where('nama', $nama)->exists();
-                            if (!$exists) {
-                                Tamu::create(['nama' => $nama]);
-                                $importedCount++;
-                            } else {
-                                $skippedCount++;
+                        foreach ($lines as $line) {
+                            $line = trim($line);
+                            if (empty($line)) continue;
+                            
+                            // Handle both comma and semicolon separators
+                            $data = str_getcsv($line, ',', '"');
+                            if (count($data) == 1) {
+                                $data = str_getcsv($line, ';', '"');
+                            }
+                            
+                            $nama = trim($data[0] ?? '');
+                            
+                            if (!empty($nama)) {
+                                // Check if already exists
+                                $exists = Tamu::where('nama', $nama)->exists();
+                                if (!$exists) {
+                                    Tamu::create(['nama' => $nama]);
+                                    $importedCount++;
+                                } else {
+                                    $skippedCount++;
+                                }
                             }
                         }
+                        
+                        // Delete uploaded file
+                        Storage::disk('local')->delete($data['csv_file']);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Import CSV Berhasil')
+                            ->body("Berhasil import {$importedCount} tamu baru. {$skippedCount} data dilewati karena sudah ada.")
+                            ->success()
+                            ->send();
+                    } catch (\Exception $e) {
+                        \Filament\Notifications\Notification::make()
+                            ->title('Import CSV Gagal')
+                            ->body('Error: ' . $e->getMessage())
+                            ->danger()
+                            ->send();
                     }
-                    
-                    // Delete uploaded file
-                    Storage::disk('local')->delete($data['csv_file']);
-                    
-                    \Filament\Notifications\Notification::make()
-                        ->title('Import CSV Berhasil')
-                        ->body("Berhasil import {$importedCount} tamu baru. {$skippedCount} data dilewati karena sudah ada.")
-                        ->success()
-                        ->send();
                 }),
         ];
     }
