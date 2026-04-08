@@ -79,9 +79,15 @@ class TamuResource extends Resource
                         ->color('success')
                         ->action(function (Collection $records) {
                             $ids = $records->pluck('id')->toArray();
-                            $idsParam = implode(',', $ids);
                             
-                            return redirect("/api/bulk-download-qr?ids={$idsParam}");
+                            // Create form data
+                            $formData = http_build_query(['ids' => $ids]);
+                            
+                            // Create temporary HTML form and submit
+                            return response()->view('bulk-download-form', [
+                                'url' => '/api/bulk-download-qr',
+                                'ids' => $ids
+                            ]);
                         }),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
