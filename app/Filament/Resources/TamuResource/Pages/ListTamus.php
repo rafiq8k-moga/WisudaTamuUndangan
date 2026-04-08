@@ -3,8 +3,12 @@
 namespace App\Filament\Resources\TamuResource\Pages;
 
 use App\Filament\Resources\TamuResource;
+use App\Models\Tamu;
 use Filament\Actions;
+use Filament\Forms;
+use Filament\Forms\Components\FileUpload;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Support\Facades\Storage;
 
 class ListTamus extends ListRecords
 {
@@ -19,7 +23,7 @@ class ListTamus extends ListRecords
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('warning')
                 ->form([
-                    Forms\Components\FileUpload::make('csv_file')
+                    FileUpload::make('csv_file')
                         ->label('File CSV')
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.ms-excel', 'text/plain'])
