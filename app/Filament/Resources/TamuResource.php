@@ -80,14 +80,42 @@ class TamuResource extends Resource
                         ->action(function (Collection $records) {
                             $ids = $records->pluck('id')->toArray();
                             
-                            // Create form data
-                            $formData = http_build_query(['ids' => $ids]);
+                            // Generate ZIP directly instead of redirecting
+                            $tamus = \App\Models\Tamu::whereIn('id', $ids)->get();
                             
-                            // Create temporary HTML form and submit
-                            return response()->view('bulk-download-form', [
-                                'url' => '/api/bulk-download-qr',
-                                'ids' => $ids
-                            ]);
+                            $zipFileName = 'qr-codes-' . now()->format('Y-m-d-His') . '.zip';
+                            $zipPath = storage_path('app/temp/' . $zipFileName);
+                            
+                            if (!is_dir(storage_path('app/temp'))) {
+                                mkdir(storage_path('app/temp'), 0755, true);
+                            }
+                            
+                            $zip = new \ZipArchive();
+                            $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+                            
+                            foreach ($tamus as $tamu) {
+                                $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=" . urlencode($tamu->qr_code);
+                                $qrImage = file_get_contents($qrUrl);
+                                
+                                $cleanName = preg_replace('/[^a-zA-Z0-9\s]/', '', $tamu->nama);
+                                $cleanName = trim($cleanName);
+                                $fileName = $cleanName . '.png';
+                                
+                                $counter = 1;
+                                $originalName = $fileName;
+                                while ($zip->locateName($fileName) !== false) {
+                                    $fileName = pathinfo($originalName, PATHINFO_FILENAME) . '_' . $counter . '.png';
+                                    $counter++;
+                                }
+                                
+                                $zip->addFromString($fileName, $qrImage);
+                            }
+                            
+                            $zip->close();
+                            
+                            return response()->download($zipPath, $zipFileName, [
+                                'Content-Type' => 'application/zip',
+                            ])->deleteFileAfterSend(true);
                         }),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),

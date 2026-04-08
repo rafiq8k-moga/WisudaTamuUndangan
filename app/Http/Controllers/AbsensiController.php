@@ -84,13 +84,6 @@ class AbsensiController extends Controller
     {
         $ids = $request->input('ids', []);
 
-        // Handle both array and comma-separated string
-        if (is_string($ids)) {
-            $ids = explode(',', $ids);
-        }
-
-        $ids = array_filter($ids, 'is_numeric');
-
         if (empty($ids)) {
             return response()->json(['message' => 'Tidak ada tamu yang dipilih'], 400);
         }
@@ -136,8 +129,6 @@ class AbsensiController extends Controller
 
         return response()->download($zipPath, $zipFileName, [
             'Content-Type' => 'application/zip',
-            'Content-Disposition' => 'attachment; filename="' . $zipFileName . '"',
-            'Content-Length' => filesize($zipPath),
         ])->deleteFileAfterSend(true);
     }
 }
