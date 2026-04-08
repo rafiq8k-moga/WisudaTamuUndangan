@@ -14,6 +14,63 @@ class ListTamus extends ListRecords
     {
         return [
             Actions\CreateAction::make(),
+            Actions\Action::make('importCSV')
+                ->label('Import CSV')
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('warning')
+                ->form([
+                    Forms\Components\FileUpload::make('csv_file')
+                        ->label('File CSV')
+                        ->required()
+                        ->acceptedFileTypes(['text/csv', 'application/vnd.ms-excel', 'text/plain'])
+                        ->helperText('Upload file CSV dengan format: nama (header di baris pertama)')
+                        ->directory('csv-imports')
+                        ->maxSize(1024), // 1MB
+                ])
+                ->action(function (array $data) {
+                    $csvPath = Storage::disk('local')->path($data['csv_file']);
+                    $csvContent = file_get_contents($csvPath);
+                    $lines = explode("\n", $csvContent);
+                    
+                    $importedCount = 0;
+                    $skippedCount = 0;
+                    
+                    // Skip header (first line)
+                    array_shift($lines);
+                    
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (empty($line)) continue;
+                        
+                        // Handle both comma and semicolon separators
+                        $data = str_getcsv($line, ',', '"');
+                        if (count($data) == 1) {
+                            $data = str_getcsv($line, ';', '"');
+                        }
+                        
+                        $nama = trim($data[0] ?? '');
+                        
+                        if (!empty($nama)) {
+                            // Check if already exists
+                            $exists = Tamu::where('nama', $nama)->exists();
+                            if (!$exists) {
+                                Tamu::create(['nama' => $nama]);
+                                $importedCount++;
+                            } else {
+                                $skippedCount++;
+                            }
+                        }
+                    }
+                    
+                    // Delete uploaded file
+                    Storage::disk('local')->delete($data['csv_file']);
+                    
+                    \Filament\Notifications\Notification::make()
+                        ->title('Import CSV Berhasil')
+                        ->body("Berhasil import {$importedCount} tamu baru. {$skippedCount} data dilewati karena sudah ada.")
+                        ->success()
+                        ->send();
+                }),
         ];
     }
 }
