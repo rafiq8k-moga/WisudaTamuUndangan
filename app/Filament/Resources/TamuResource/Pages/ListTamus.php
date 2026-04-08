@@ -28,12 +28,13 @@ class ListTamus extends ListRecords
                         ->required()
                         ->acceptedFileTypes(['text/csv', 'application/vnd.ms-excel', 'text/plain'])
                         ->helperText('Upload file CSV dengan format: nama (header di baris pertama)')
+                        ->disk('public')
                         ->directory('csv-imports')
-                        ->maxSize(1024), // 1MB
+                        ->maxSize(5120), // 5MB
                 ])
                 ->action(function (array $data) {
                     try {
-                        $csvContent = Storage::disk('local')->get($data['csv_file']);
+                        $csvContent = Storage::disk('public')->get($data['csv_file']);
                         $lines = explode("\n", $csvContent);
                         
                         $importedCount = 0;
@@ -71,7 +72,7 @@ class ListTamus extends ListRecords
                         }
                         
                         // Delete uploaded file
-                        Storage::disk('local')->delete($data['csv_file']);
+                        Storage::disk('public')->delete($data['csv_file']);
                         
                         \Filament\Notifications\Notification::make()
                             ->title('Import CSV Berhasil')
