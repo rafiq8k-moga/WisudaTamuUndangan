@@ -82,35 +82,38 @@ class AbsensiController extends Controller
 
     public function bulkDownloadQR(Request $request)
     {
-        $ids = $request->input('ids', []);
+        try {
+            $ids = $request->input('ids', []);
 
-        // Handle both array and comma-separated string
-        if (is_string($ids)) {
-            $ids = explode(',', $ids);
-        }
+            // Handle both array and comma-separated string
+            if (is_string($ids)) {
+                $ids = explode(',', $ids);
+            }
 
-        $ids = array_filter($ids, 'is_numeric');
+            $ids = array_filter($ids, 'is_numeric');
 
-        if (empty($ids)) {
-            return response()->json(['message' => 'Tidak ada tamu yang dipilih'], 400);
-        }
+            if (empty($ids)) {
+                return response()->json(['message' => 'Tidak ada tamu yang dipilih', 'ids' => $request->input('ids')], 400);
+            }
 
-        $tamus = Tamu::whereIn('id', $ids)->get();
+            $tamus = Tamu::whereIn('id', $ids)->get();
 
-        if ($tamus->isEmpty()) {
-            return response()->json(['message' => 'Tamu tidak ditemukan'], 404);
-        }
+            if ($tamus->isEmpty()) {
+                return response()->json(['message' => 'Tamu tidak ditemukan', 'ids' => $ids], 404);
+            }
 
-        $zipFileName = 'qr-codes-' . now()->format('Y-m-d-His') . '.zip';
-        $zipPath = storage_path('app/temp/' . $zipFileName);
+            $zipFileName = 'qr-codes-' . now()->format('Y-m-d-His') . '.zip';
+            $zipPath = storage_path('app/temp/' . $zipFileName);
 
-        // Ensure temp directory exists
-        if (!is_dir(storage_path('app/temp'))) {
-            mkdir(storage_path('app/temp'), 0755, true);
-        }
+            // Ensure temp directory exists
+            if (!is_dir(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0755, true);
+            }
 
-        $zip = new ZipArchive();
-        $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+            $zip = new ZipArchive();
+            if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+                return response()->json(['message' => 'Failed to create ZIP file'], 500);
+            }
 
         foreach ($tamus as $tamu) {
             $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=" . urlencode($tamu->qr_code);
@@ -134,10 +137,19 @@ class AbsensiController extends Controller
 
         $zip->close();
 
+        if (!file_exists($zipPath)) {
+            return response()->json(['message' => 'ZIP file not created'], 500);
+        }
+
         return response()->download($zipPath, $zipFileName, [
             'Content-Type' => 'application/zip',
             'Content-Disposition' => 'attachment; filename="' . $zipFileName . '"',
             'Content-Length' => filesize($zipPath),
         ])->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            \Log::error('Bulk download QR error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error: ' . $e->getMessage()], 500);
+        }
     }
 }
