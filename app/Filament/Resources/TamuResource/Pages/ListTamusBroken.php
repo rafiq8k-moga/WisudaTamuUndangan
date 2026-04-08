@@ -92,9 +92,6 @@ class ListTamus extends ListRecords
                 ->icon('heroicon-o-qr-code')
                 ->color('success')
                 ->action(function () {
-                    // Increase execution time for large datasets
-                    set_time_limit(300); // 5 minutes
-                    
                     $tamus = Tamu::all();
                     
                     if ($tamus->isEmpty()) {
@@ -106,6 +103,13 @@ class ListTamus extends ListRecords
                         return;
                     }
                     
+                    // Show progress notification
+                    \Filament\Notifications\Notification::make()
+                        ->title('Memproses QR Code')
+                        ->body("Sedang generate {$tamus->count()} QR code. Mohon tunggu...")
+                        ->info()
+                        ->send();
+                    
                     $zipFileName = 'all-qr-codes-' . now()->format('Y-m-d-His') . '.zip';
                     $zipPath = storage_path('app/temp/' . $zipFileName);
                     
@@ -116,25 +120,28 @@ class ListTamus extends ListRecords
                     $zip = new \ZipArchive();
                     $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
                     
-                    $processed = 0;
-                    $failed = 0;
-                    
                     foreach ($tamus as $tamu) {
                         $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=" . urlencode($tamu->qr_code);
                         
-                        // Use curl with timeout instead of file_get_contents
-                        $ch = curl_init($qrUrl);
-                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($ch, CURLOPT_TIMEOUT, 10); // 10 seconds per QR
-                        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-                        $qrImage = curl_exec($ch);
-                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                        curl_close($ch);
+                        // Add timeout and error handling
+                        $context = stream_context_create([
+                            'http' => [
+                                'timeout' => 10,
+                                'method' => 'GET'
+                            ]
+                        ]);
+                        $qrImage = @file_get_contents($qrUrl, false, $context);
                         
-                        if ($httpCode !== 200 || $qrImage === false) {
-                            $failed++;
-                            continue; // Skip failed QR
+                        if ($qrImage === false) {
+                            // Skip if QR generation fails
+                            continue;
                         }
+                    $zip = new \ZipArchive();
+                    $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+                    
+                    foreach ($tamus as $tamu) {
+                        $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=" . urlencode($tamu->qr_code);
+                        $qrImage = file_get_contents($qrUrl);
                         
                         $cleanName = preg_replace('/[^a-zA-Z0-9\s]/', '', $tamu->nama);
                         $cleanName = trim($cleanName);
@@ -152,14 +159,13 @@ class ListTamus extends ListRecords
                     
                     $zip->close();
                     
-                    // Send notification about partial success if there were failures
-                    if ($failed > 0) {
-                        \Filament\Notifications\Notification::make()
-                            ->title('Download QR Selesai')
-                            ->body("Berhasil download {$processed} QR code. {$failed} gagal.")
-                            ->warning()
-                            ->send();
-                    }
+                    $successCount = $zip->numFiles;
+                    
+                    \Filament\Notifications\Notification::make()
+                        ->title('Download QR Berhasil')
+                        ->body("Berhasil generate {$successCount} QR code. File ZIP sedang di-download.")
+                        ->success()
+                        ->send();
                     
                     return response()->download($zipPath, $zipFileName, [
                         'Content-Type' => 'application/zip',
