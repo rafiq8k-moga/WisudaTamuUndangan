@@ -100,7 +100,7 @@ class TamuResource extends Resource
                                 
                                 $cleanName = preg_replace('/[^a-zA-Z0-9\s]/', '', $tamu->nama);
                                 $cleanName = trim($cleanName);
-                                $fileName = $cleanName . '.png';
+                                $fileName = "({$tamu->id})_" . $cleanName . '.png';
                                 
                                 $counter = 1;
                                 $originalName = $fileName;
