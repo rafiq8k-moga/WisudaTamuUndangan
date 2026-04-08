@@ -46,13 +46,17 @@ class ListTamus extends ListRecords
                             $line = trim($line);
                             if (empty($line)) continue;
                             
-                            // Handle both comma and semicolon separators
+                            // Handle different CSV formats
                             $data = str_getcsv($line, ',', '"');
                             if (count($data) == 1) {
                                 $data = str_getcsv($line, ';', '"');
                             }
-                            
-                            $nama = trim($data[0] ?? '');
+                            if (count($data) == 1) {
+                                // If still only one column, the line itself is the name
+                                $nama = $line;
+                            } else {
+                                $nama = trim($data[0] ?? '');
+                            }
                             
                             if (!empty($nama)) {
                                 // Check if already exists
